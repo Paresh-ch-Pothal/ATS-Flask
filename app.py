@@ -11,7 +11,7 @@ import os
 from dotenv import load_dotenv
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+CORS(app, resources={r"/*": {"origins": ["https://clickresume.vercel.app", "http://localhost:5173"]}})
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
