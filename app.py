@@ -343,11 +343,27 @@ def unique_role():
 
 
 
+def convertSkills(all_jobs):
+    for job in all_jobs:
+        skills_str = job.get("skills", "")
+        job["skills"] = [skill.strip() for skill in skills_str.split(",")]
+    return all_jobs
+
+
 @app.route("/calculate_ats_scoreMERN", methods=['POST'])
 def calculate_atsMERN():
     try:
         data = request.get_json()
-        all_jobs = data.get("allJobs", [])
+        all_jobs = data.get("allJobs", [])\
+
+
+
+        # here this is changes
+        all_jobs=convertSkills(all_jobs)
+        # here this is changes
+
+
+
         structured_data = data.get("text", {})
         selected_option = data.get("selectedOption", "None")
 
