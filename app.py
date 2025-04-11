@@ -115,7 +115,7 @@ class ATSMatcher:
         job_df["ATS Score"] = similarity_scores
 
         # Sort and return top 5
-        top_matches = job_df[["_id", "jobRole", "ATS Score"]].sort_values(
+        top_matches = job_df[["id", "jobRole", "ATS Score"]].sort_values(
             by="ATS Score", ascending=False
         ).head(5)
 
