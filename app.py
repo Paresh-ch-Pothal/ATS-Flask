@@ -87,8 +87,8 @@ class ATSMatcher:
 
         # Prepare combined job text for each row
         def combine_job_text(row):
-            desc = str(row.get("jobDescription", "")) # here jobDescription to description
-            skills = row.get("requiredSkills", []) # here requiredSkills to skills
+            desc = str(row.get("description", "")) # here jobDescription to description
+            skills = row.get("skills", []) # here requiredSkills to skills
             skills_str = ", ".join(skills) if isinstance(skills, list) else str(skills)
             return f"{desc} {skills_str}".lower()
 
@@ -115,7 +115,7 @@ class ATSMatcher:
         job_df["ATS Score"] = similarity_scores
 
         # Sort and return top 5
-        top_matches = job_df[["_id", "jobRole", "ATS Score"]].sort_values(   # here _ id to id
+        top_matches = job_df[["id", "jobRole", "ATS Score"]].sort_values(   # here _ id to id
             by="ATS Score", ascending=False
         ).head(5)
 
@@ -354,7 +354,7 @@ def convertSkills(all_jobs):
 def calculate_atsMERN():
     try:
         data = request.get_json()
-        all_jobs = data.get("allJobs", [])\
+        all_jobs = data.get("allJobs", [])
 
 
 
