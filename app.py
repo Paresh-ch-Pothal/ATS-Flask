@@ -201,12 +201,56 @@ def get_resume_data_from_gemini(resume_text):
         return {"error": f"API Error {response.status_code}: {response.text}"}
 
 
+# def get_resume_feedback(resume_text):
+#     """Use Gemini API to analyze resume and provide feedback."""
+#     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+#     headers = {"Content-Type": "application/json"}
+#
+#     # Escaping curly braces in f-string to prevent format errors
+#     prompt = f"""
+#     Analyze the given resume text and provide structured feedback.
+#     The output should be in valid JSON format with the following fields:
+#
+#     {{
+#         "Strengths": [],
+#         "Weaknesses": [],
+#         "Suggestions": [],
+#         "Overall Assessment": "Weak / Medium / Strong / Excellent"
+#     }}
+#
+#     Resume Text:
+#     {resume_text}
+#     """
+#
+#     payload = {"contents": [{"parts": [{"text": prompt}]}]}
+#
+#     try:
+#         response = requests.post(url, headers=headers, data=json.dumps(payload))
+#         response.raise_for_status()  # Raise error for non-200 status codes
+#
+#         result = response.json()
+#
+#         # Gemini API's response might have a different structure
+#         if "candidates" in result and result["candidates"]:
+#             api_response_text = result["candidates"][0]["content"]["parts"][0]["text"]
+#             return clean_json_response(api_response_text)
+#         else:
+#             return {"error": "Unexpected response format from Gemini API"}
+#
+#     except requests.exceptions.RequestException as e:
+#         return {"error": f"API Request Failed: {str(e)}"}
+#
+#     except KeyError:
+#         return {"error": "Invalid response format from API"}
+
+
+
 def get_resume_feedback(resume_text):
-    """Use Gemini API to analyze resume and provide feedback."""
+    """Use Gemini API to analyze resume and provide structured feedback."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
 
-    # Escaping curly braces in f-string to prevent format errors
+    # Main structured feedback prompt
     prompt = f"""
     Analyze the given resume text and provide structured feedback.
     The output should be in valid JSON format with the following fields:
@@ -226,22 +270,82 @@ def get_resume_feedback(resume_text):
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()  # Raise error for non-200 status codes
-
+        response.raise_for_status()
         result = response.json()
 
-        # Gemini API's response might have a different structure
         if "candidates" in result and result["candidates"]:
             api_response_text = result["candidates"][0]["content"]["parts"][0]["text"]
-            return clean_json_response(api_response_text)
+            main_data = clean_json_response(api_response_text)
         else:
             return {"error": "Unexpected response format from Gemini API"}
-
     except requests.exceptions.RequestException as e:
         return {"error": f"API Request Failed: {str(e)}"}
-
     except KeyError:
         return {"error": "Invalid response format from API"}
+
+    # Enrich with improvement + keywords prompts
+    PROMPTS = {
+        "improvement": """As a career coach, provide:
+        1. 3 technical skills to develop with learning resources
+        2. 2 soft skills to highlight
+        3. Resume formatting improvements
+        4. Project suggestions to bridge gaps
+        Format: Numbered list with brief explanations
+        Instructions: Do NOT use any Markdown formatting (e.g., **bold**, __underline__, bullet points, or ---). Keep the response in plain text only. Each suggestion must be a readable sentence without section headers or special characters.""",
+
+        "keywords": """As an ATS keyword optimizer:
+        Identify missing hard skills and soft skills from the job description that are not mentioned in the resume.
+        Output Format:
+        A single line containing all missing keywords (both hard and soft skills) as a comma-separated list.
+        Do not include labels like 'Missing skill:' or 'Suggested placement:'.
+        Do not use any bullet points, asterisks, hyphens, colons, or formatting.
+        Return only the comma-separated list of keywords in plain text."""
+    }
+
+    # Ensure required keys exist
+    main_data.setdefault("Strengths", [])
+    main_data.setdefault("Weaknesses", [])
+    main_data.setdefault("Suggestions", [])
+
+    for key, prompt_text in PROMPTS.items():
+        enriched_prompt = f"{prompt_text}\n\nResume Text:\n{resume_text}"
+        payload = {"contents": [{"parts": [{"text": enriched_prompt}]}]}
+
+        try:
+            res = requests.post(url, headers=headers, data=json.dumps(payload))
+            res.raise_for_status()
+            enriched_result = res.json()
+
+            if "candidates" in enriched_result and enriched_result["candidates"]:
+                enriched_text = enriched_result["candidates"][0]["content"]["parts"][0]["text"]
+                lines = [line.strip("-•1234567890. ").strip() for line in enriched_text.splitlines() if line.strip()]
+
+                if key == "improvement":
+                    for line in lines:
+                        lower = line.lower()
+                        if any(kw in lower for kw in ["format", "project", "add", "consider", "quantify", "tailor", "proofread", "develop", "learn", "organize"]):
+                            main_data["Suggestions"].append(line)
+                        elif any(kw in lower for kw in ["highlight", "proficient", "strong", "effective", "excellent"]):
+                            main_data["Strengths"].append(line)
+                        elif any(kw in lower for kw in ["lack", "missing", "need to improve", "should improve"]):
+                            main_data["Weaknesses"].append(line)
+
+                elif key == "keywords":
+                    # Expecting a single comma-separated line of skills
+                    keywords_line = enriched_text.strip()
+                    if keywords_line:
+                        main_data["Weaknesses"].append(f"Missing keywords: {keywords_line}")
+
+        except requests.exceptions.RequestException:
+            continue
+        except KeyError:
+            continue
+
+    return main_data
+
+
+
+
 
 
 
