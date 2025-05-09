@@ -11,7 +11,8 @@ import os
 from dotenv import load_dotenv
 
 app = Flask(__name__)
-CORS(app, origins="*", supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["https://clickresume.vercel.app", "http://localhost:5173"]}}, supports_credentials=True)
+
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
@@ -357,7 +358,7 @@ def home():
     return render_template("index.html")
 
 structured_data=[]
-@app.route("/upload", methods=['POST',"OPTIONS"])
+@app.route("/upload", methods=['POST'])
 def uploadResume():
     if 'resume' not in request.files:
         return jsonify({"error": "No file uploaded","success" : False}), 400
@@ -383,7 +384,7 @@ print(structured_data)
 
 
 
-@app.route("/uniqueJobRoleFromMERN", methods=["POST","OPTIONS"])
+@app.route("/uniqueJobRoleFromMERN", methods=["POST"])
 def unique_role():
     data = request.get_json()
 
