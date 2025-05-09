@@ -11,12 +11,7 @@ import os
 from dotenv import load_dotenv
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": [
-    "https://clickresume.vercel.app",
-    "http://localhost:5173",
-    "https://ats-orpin.vercel.app",
-    "https://click-resume.vercel.app"
-]}}, supports_credentials=True)
+CORS(app, origins="*", supports_credentials=True)
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
@@ -459,7 +454,7 @@ def convertSkills(all_jobs):
     return all_jobs
 
 
-@app.route("/calculate_ats_scoreMERN", methods=['POST',"OPTIONS"])
+@app.route("/calculate_ats_scoreMERN", methods=['POST'])
 def calculate_atsMERN():
     try:
         data = request.get_json()
@@ -525,7 +520,7 @@ def calculate_atsMERN():
 
 
 
-@app.route("/feedbackMERN", methods=["POST","OPTIONS"])
+@app.route("/feedbackMERN", methods=["POST"])
 def GetFeedBackMERN():
     # Assuming the structured data is being passed as a JSON payload in the request body
     data1 = request.get_json()
