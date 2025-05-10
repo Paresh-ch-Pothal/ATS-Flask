@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import os
 from dotenv import load_dotenv
+import numpy as np
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["https://clickresume.vercel.app", "http://localhost:5173"]}}, supports_credentials=True)
@@ -16,8 +17,17 @@ CORS(app, resources={r"/*": {"origins": ["https://clickresume.vercel.app", "http
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+def rescale_similarity(raw_score):
+    return min(max(raw_score / 0.2 * 100, 0), 100)
+
+def sigmoid_rescale(score):
+    import math
+    return int(100 / (1 + math.exp(-15 * (score - 0.2))))  # 0.2 is the center
+
 
 # class function for ats score
+
+
 class ATSMatcher:
     def __init__(self, job_data_json):
         """
@@ -94,7 +104,8 @@ class ATSMatcher:
             return f"{desc} {skills_str}".lower()
 
         job_df["combinedText"] = job_df.apply(combine_job_text, axis=1)
-        print(job_df)
+        print(job_df['combinedText'][7])
+
 
         # Prepare user profile text (just skills, because CGPA is not used for similarity here)
         user_profile_text = ", ".join([skill.strip().lower() for skill in user_skills])
@@ -109,9 +120,14 @@ class ATSMatcher:
         print(similarity_scores)
 
         # Normalize similarity scores between 0 and 100
-        similarity_scores = (similarity_scores - similarity_scores.min()) / (
-                similarity_scores.max() - similarity_scores.min() + 1e-5
-        ) * 100
+        if len(similarity_scores) == 1:
+            similarity_scores = np.array([rescale_similarity(similarity_scores[0])])
+        else:
+            # similarity_scores = (similarity_scores - similarity_scores.min()) / (
+            #         similarity_scores.max() - similarity_scores.min() + 1e-5
+            # ) * 100
+            similarity_scores = np.array([sigmoid_rescale(s) for s in similarity_scores])
+        print("similarity scores :" , similarity_scores)
 
         job_df["ATS Score"] = similarity_scores
 
@@ -160,27 +176,29 @@ def get_resume_data_from_gemini(resume_text):
     headers = {"Content-Type": "application/json"}
 
     prompt = f"""
-    Extract structured resume details from the given text.
-    The output should be in valid JSON format with fields:
+Extract structured resume details from the given text.
+The output must be in valid JSON format. In particular:
 
-    {{
-        "Name": "",
-        "Summary": "",
-        "Skills": []
-        "Education": [
-        ],
-        "Work Experience": [
-        ],
-        "Projects": [
-        ],
-        "Achievements": [],
-        "Certifications": [],
-        "CGPA": ""
-    }}
+- "Skills" must be a flat list of individual skills (e.g., ["Python", "React", "Git"])
+- Avoid categorizing skills under headings like "Programming Languages" or "Tools"
+- All values must be strings, not nested structures.
 
-    Resume Text:
-    {resume_text}
-    """
+Output format:
+{{
+    "Name": "",
+    "Summary": "",
+    "Skills": [],
+    "Education": [],
+    "Work Experience": [],
+    "Projects": [],
+    "Achievements": [],
+    "Certifications": [],
+    "CGPA": ""
+}}
+
+Resume Text:
+{resume_text}
+"""
 
     payload = {
         "contents": [{
